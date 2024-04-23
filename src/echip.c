@@ -1,10 +1,10 @@
 #include <X11/Xatom.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
-#include <bits/time.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
+#include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #define HEIGHT 320
@@ -57,7 +57,65 @@ Window create_app_window(Display *display, Window root, XVisualInfo vis_info) {
   return app_window;
 }
 
-int main(void) {
+void decode(unsigned char *bytes, size_t size) {
+  printf("We received %lu\n", size);
+  for (int i = 0; i < size; i = i + 2) {
+    unsigned char left_nibble = bytes[i] >> 4;
+    unsigned char right_nibble = bytes[i] & 31;
+    printf("Left: %02x, Right: %02x, Full: %02x, Arg: %02x\n", left_nibble,
+           right_nibble, bytes[i], bytes[i + 1]);
+    switch (left_nibble) {
+    case 0:
+      printf("This is a clear screen or return instruction\n");
+      break;
+    case 1:
+      printf("This is a jump instruction.\n");
+      break;
+    case 6:
+      printf("This is a set register instruction\n");
+      break;
+    case 7:
+      printf("This is an add value to register instruction\n");
+      break;
+    case 10:
+      printf("This is set index register instruction\n");
+      break;
+    case 13:
+      printf("This is a draw instruction\n");
+      break;
+    default:
+      printf("Unrecognized opcode\n");
+      break;
+    }
+  }
+}
+
+int main(int argc, char **argv) {
+  if (argc < 2) {
+    printf("Usage: echip file\n");
+    return 1;
+  }
+
+  char *filename = argv[1];
+  FILE *fp = fopen(filename, "rb");
+  if (fp == NULL) {
+    fprintf(stderr, "File %s not found.\n", filename);
+  }
+  struct stat file_info;
+  fstat(fileno(fp), &file_info);
+  size_t file_size = file_info.st_size;
+  unsigned char *bytes = malloc(file_size);
+  size_t bytes_read = fread(bytes, 1, file_size, fp);
+  if (bytes_read != file_size) {
+    fprintf(stderr, "An error occurred while trying to read the file.\n");
+    free(bytes);
+    fclose(fp);
+    return 1;
+  }
+  decode(bytes, file_size);
+  free(bytes);
+  fclose(fp);
+  return 0;
   Display *display = XOpenDisplay(NULL);
   if (display == NULL) {
     fprintf(stderr, "No display available.\n");
@@ -112,14 +170,16 @@ int main(void) {
     }
     case KeyPress: {
       if (event.xkey.keycode == XKeysymToKeycode(display, XK_R)) {
-          printf("Painting the canvas red\n");
-          color_buffer(raw_buffer, RED, WIDTH, HEIGHT);
-          XPutImage(display, app_window, gc, image_buffer, 0, 0, 0, 0, WIDTH, HEIGHT);
+        printf("Painting the canvas red\n");
+        color_buffer(raw_buffer, RED, WIDTH, HEIGHT);
+        XPutImage(display, app_window, gc, image_buffer, 0, 0, 0, 0, WIDTH,
+                  HEIGHT);
       }
       if (event.xkey.keycode == XKeysymToKeycode(display, XK_B)) {
-          printf("Painting the canvas blue\n");
-          color_buffer(raw_buffer, BLUE, WIDTH, HEIGHT);
-          XPutImage(display, app_window, gc, image_buffer, 0, 0, 0, 0, WIDTH, HEIGHT);
+        printf("Painting the canvas blue\n");
+        color_buffer(raw_buffer, BLUE, WIDTH, HEIGHT);
+        XPutImage(display, app_window, gc, image_buffer, 0, 0, 0, 0, WIDTH,
+                  HEIGHT);
       }
       break;
     }
