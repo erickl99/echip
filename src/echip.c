@@ -21,6 +21,25 @@
 #define BLUE 0x000000FF
 #define PURPLE 0x00FF00FF
 
+#define PREFIX_0 0
+#define PREFIX_1 1
+#define PREFIX_2 2
+#define PREFIX_3 3
+#define PREFIX_4 4
+#define PREFIX_5 5
+#define PREFIX_6 6
+#define PREFIX_7 7
+#define PREFIX_8 8
+#define PREFIX_9 9
+#define PREFIX_A 10
+#define PREFIX_B 11
+#define PREFIX_C 12
+#define PREFIX_D 13
+#define PREFIX_E 14
+#define PREFIX_F 15
+#define CLEAR_SCREEN 0xE0
+#define LEFT_MASK 15
+
 void color_buffer(char *buffer, unsigned int color, int width, int height) {
   int pitch = width * PIXEL_BYTES;
   for (int y = 0; y < height; y++) {
@@ -60,29 +79,44 @@ Window create_app_window(Display *display, Window root, XVisualInfo vis_info) {
 void decode(unsigned char *bytes, size_t size) {
   printf("We received %lu\n", size);
   for (int i = 0; i < size; i = i + 2) {
-    unsigned char left_nibble = bytes[i] >> 4;
-    unsigned char right_nibble = bytes[i] & 31;
-    printf("Left: %02x, Right: %02x, Full: %02x, Arg: %02x\n", left_nibble,
-           right_nibble, bytes[i], bytes[i + 1]);
-    switch (left_nibble) {
-    case 0:
-      printf("This is a clear screen or return instruction\n");
+    unsigned char left_byte = bytes[i];
+    unsigned char right_byte = bytes[i + 1];
+    unsigned char first_nibble = left_byte >> 4;
+    unsigned char second_nibble = left_byte & LEFT_MASK;
+    printf("Left: %02x, Right: %02x, Full: %02x, Arg: %02x\n", first_nibble,
+           second_nibble, left_byte, right_byte);
+    switch (first_nibble) {
+    case PREFIX_0: {
+      if (right_byte == CLEAR_SCREEN) {
+        printf("We have a clear screen instruction\n");
+      } else {
+        printf("We have a return instruction\n");
+      }
       break;
-    case 1:
-      printf("This is a jump instruction.\n");
+    }
+    case PREFIX_1: {
+      short address = (second_nibble << 8) + bytes[i + 1];
+      printf("We need to jump to %03x\n", address);
       break;
-    case 6:
-      printf("This is a set register instruction\n");
+    }
+    case PREFIX_6:
+      printf("Setting register %d to value %02x\n", second_nibble, right_byte);
       break;
-    case 7:
-      printf("This is an add value to register instruction\n");
+    case PREFIX_7:
+      printf("Adding to register %d value %02x\n", second_nibble, right_byte);
       break;
-    case 10:
-      printf("This is set index register instruction\n");
+    case PREFIX_A: {
+      unsigned short address = (second_nibble << 8) + right_byte;
+      printf("Setting index register to value %03x\n", address);
       break;
-    case 13:
-      printf("This is a draw instruction\n");
+    }
+    case PREFIX_D: {
+      unsigned char third_nibble = right_byte >> 4;
+      unsigned char fourth_nibble = right_byte & LEFT_MASK;
+      printf("Drawing %d pixels tall sprite at location (%d, %d)\n",
+             fourth_nibble, second_nibble, third_nibble);
       break;
+    }
     default:
       printf("Unrecognized opcode\n");
       break;
