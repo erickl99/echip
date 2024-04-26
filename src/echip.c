@@ -1,3 +1,4 @@
+#include "vm.h"
 #include <X11/Xatom.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
@@ -7,8 +8,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#define HEIGHT 320
-#define WIDTH 320
+#define HEIGHT 512
+#define WIDTH 256
 
 #define BIT_DEPTH 24
 
@@ -16,29 +17,11 @@
 #define PIXEL_BYTES 4
 
 #define WHITE 0x00FFFFFF
+#define BLACK 0x00000000
 #define RED 0x00FF0000
 #define GREEN 0x0000FF00
 #define BLUE 0x000000FF
 #define PURPLE 0x00FF00FF
-
-#define PREFIX_0 0
-#define PREFIX_1 1
-#define PREFIX_2 2
-#define PREFIX_3 3
-#define PREFIX_4 4
-#define PREFIX_5 5
-#define PREFIX_6 6
-#define PREFIX_7 7
-#define PREFIX_8 8
-#define PREFIX_9 9
-#define PREFIX_A 10
-#define PREFIX_B 11
-#define PREFIX_C 12
-#define PREFIX_D 13
-#define PREFIX_E 14
-#define PREFIX_F 15
-#define CLEAR_SCREEN 0xE0
-#define LEFT_MASK 15
 
 void color_buffer(char *buffer, unsigned int color, int width, int height) {
   int pitch = width * PIXEL_BYTES;
@@ -46,12 +29,35 @@ void color_buffer(char *buffer, unsigned int color, int width, int height) {
     char *row = buffer + (y * pitch);
     for (int x = 0; x < width; x++) {
       unsigned int *px = (unsigned int *)(row + (x * PIXEL_BYTES));
-      if (x % 16 && y % 16) {
+      if (x % 8 && y % 8) {
         *px = color;
       } else {
-        *px = 0;
+        *px = BLACK;
       }
     }
+  }
+}
+
+void switch_pixel(char *buffer, unsigned char x, unsigned char y) {
+  int pitch = WIDTH * PIXEL_BYTES;
+  for (int i = 0; i < 8; i++) {
+    char *start = buffer + (8 * y + i) * pitch + 8 * PIXEL_BYTES * x;
+    for (int j = 0; j < 8; j++) {
+      unsigned int *px = (unsigned int *)(start + j * PIXEL_BYTES);
+      if (*px == WHITE) {
+        *px = BLACK;
+      } else {
+        *px = WHITE;
+      }
+    }
+  }
+}
+
+void color_pixels(char *buffer, unsigned char x, unsigned char y, unsigned char height) {
+  unsigned char mod_x = x % 32;
+  unsigned char mod_y = y % 64;
+  for (unsigned char i = 0; i < height && mod_y + i < 64; i++) {
+    switch_pixel(buffer, mod_x, mod_y + i);
   }
 }
 
@@ -76,80 +82,19 @@ Window create_app_window(Display *display, Window root, XVisualInfo vis_info) {
   return app_window;
 }
 
-void decode(unsigned char *bytes, size_t size) {
-  printf("We received %lu\n", size);
-  for (int i = 0; i < size; i = i + 2) {
-    unsigned char left_byte = bytes[i];
-    unsigned char right_byte = bytes[i + 1];
-    unsigned char first_nibble = left_byte >> 4;
-    unsigned char second_nibble = left_byte & LEFT_MASK;
-    printf("Left: %02x, Right: %02x, Full: %02x, Arg: %02x\n", first_nibble,
-           second_nibble, left_byte, right_byte);
-    switch (first_nibble) {
-    case PREFIX_0: {
-      if (right_byte == CLEAR_SCREEN) {
-        printf("We have a clear screen instruction\n");
-      } else {
-        printf("We have a return instruction\n");
-      }
-      break;
-    }
-    case PREFIX_1: {
-      short address = (second_nibble << 8) + bytes[i + 1];
-      printf("We need to jump to %03x\n", address);
-      break;
-    }
-    case PREFIX_6:
-      printf("Setting register %d to value %02x\n", second_nibble, right_byte);
-      break;
-    case PREFIX_7:
-      printf("Adding to register %d value %02x\n", second_nibble, right_byte);
-      break;
-    case PREFIX_A: {
-      unsigned short address = (second_nibble << 8) + right_byte;
-      printf("Setting index register to value %03x\n", address);
-      break;
-    }
-    case PREFIX_D: {
-      unsigned char third_nibble = right_byte >> 4;
-      unsigned char fourth_nibble = right_byte & LEFT_MASK;
-      printf("Drawing %d pixels tall sprite at location (%d, %d)\n",
-             fourth_nibble, second_nibble, third_nibble);
-      break;
-    }
-    default:
-      printf("Unrecognized opcode\n");
-      break;
-    }
-  }
-}
-
 int main(int argc, char **argv) {
   if (argc < 2) {
     printf("Usage: echip file\n");
     return 1;
   }
-
-  char *filename = argv[1];
-  FILE *fp = fopen(filename, "rb");
-  if (fp == NULL) {
-    fprintf(stderr, "File %s not found.\n", filename);
+  if (init_vm(argv[1]) < 0) {
+    fprintf(stderr, "Failed to start vm.\n");
+    exit(1);
   }
-  struct stat file_info;
-  fstat(fileno(fp), &file_info);
-  size_t file_size = file_info.st_size;
-  unsigned char *bytes = malloc(file_size);
-  size_t bytes_read = fread(bytes, 1, file_size, fp);
-  if (bytes_read != file_size) {
-    fprintf(stderr, "An error occurred while trying to read the file.\n");
-    free(bytes);
-    fclose(fp);
-    return 1;
+  for (int i = 0; i < 5; i++) {
+    step();
   }
-  decode(bytes, file_size);
-  free(bytes);
-  fclose(fp);
-  return 0;
+  free_vm();
   Display *display = XOpenDisplay(NULL);
   if (display == NULL) {
     fprintf(stderr, "No display available.\n");
@@ -215,10 +160,12 @@ int main(int argc, char **argv) {
         XPutImage(display, app_window, gc, image_buffer, 0, 0, 0, 0, WIDTH,
                   HEIGHT);
       }
-      break;
-    }
-    case KeyRelease: {
-      printf("You released a key\n");
+      if (event.xkey.keycode == XKeysymToKeycode(display, XK_C)) {
+        printf("Painting a sprite\n");
+        color_pixels(raw_buffer, 2, 68, 15);
+        XPutImage(display, app_window, gc, image_buffer, 0, 0, 0, 0, WIDTH,
+                  HEIGHT);
+      }
       break;
     }
     }
