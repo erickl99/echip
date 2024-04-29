@@ -1,4 +1,6 @@
 #include "vm.h"
+#include "graphics.h"
+#include <X11/Xlib.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,6 +23,7 @@
 #define PREFIX_F 15
 #define CLEAR_SCREEN 0xE0
 #define LEFT_MASK 15
+#define MAX_SPRITE_HEIGHT 15
 
 #define MAX_ADDRESS 4096
 #define RESERVED_SPACE 512
@@ -32,11 +35,12 @@ typedef struct {
   unsigned char sound_timer;
   unsigned short pc;
   unsigned char *memory;
+  char *display;
 } vm;
 
 vm echip;
 
-int init_vm(const char *program) {
+int init_vm(const char *program, char *display) {
   FILE *fp = fopen(program, "rb");
   if (fp == NULL) {
     fprintf(stderr, "Program file %s not found\n", program);
@@ -60,6 +64,7 @@ int init_vm(const char *program) {
     return -1;
   }
   echip.pc = RESERVED_SPACE;
+  echip.display = display;
   fclose(fp);
   return 0;
 }
@@ -85,6 +90,7 @@ void step() {
   case PREFIX_0: {
     if (right_byte == CLEAR_SCREEN) {
       printf("We have a clear screen instruction\n");
+      clear_screen(echip.display);
     } else {
       printf("We have a return instruction\n");
     }
@@ -94,16 +100,19 @@ void step() {
     unsigned short address = (second_nibble << 8) + right_byte;
     printf("We need to jump to %03x\n", address);
     echip.pc = address;
+    echip.pc -= 2;
     break;
   }
-  case PREFIX_6:
+  case PREFIX_6: {
     printf("Setting register %d to value %02x\n", second_nibble, right_byte);
     echip.registers[second_nibble] = right_byte;
     break;
-  case PREFIX_7:
+  }
+  case PREFIX_7: {
     printf("Adding to register %d value %02x\n", second_nibble, right_byte);
     echip.registers[second_nibble] += right_byte;
     break;
+  }
   case PREFIX_A: {
     unsigned short address = (second_nibble << 8) + right_byte;
     printf("Setting index register to value %03x\n", address);
@@ -111,15 +120,20 @@ void step() {
     break;
   }
   case PREFIX_D: {
-    unsigned char third_nibble = right_byte >> 4;
-    unsigned char fourth_nibble = right_byte & LEFT_MASK;
-    printf("Drawing the sprite %d with height %d pixels at location (%d, %d)\n",
-           echip.memory[echip.idx_reg], fourth_nibble, echip.registers[second_nibble], echip.registers[third_nibble]);
+    unsigned char x = echip.registers[second_nibble];
+    unsigned char y = echip.registers[right_byte >> 4];
+    unsigned char height = right_byte & LEFT_MASK;
+    unsigned char sprite[MAX_SPRITE_HEIGHT];
+    memcpy(sprite, echip.memory + echip.idx_reg, height);
+    printf("Drawing sprite with height %d pixels at location (%d, %d)\n",
+           height, x, y);
+    draw_sprite(echip.display, x, y, sprite, height);
     break;
   }
-  default:
+  default: {
     printf("Unrecognized opcode\n");
     break;
+  }
   }
   echip.pc += 2;
   print_state();

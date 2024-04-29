@@ -3,7 +3,7 @@
 
 #include <sys/types.h>
 
-int init_vm(const char *program);
+int init_vm(const char *program, char *display);
 void free_vm();
 void step();
 #endif // !vm_h
