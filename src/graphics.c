@@ -74,13 +74,13 @@ static void switch_pixel(char *buffer, unsigned char x, unsigned char y) {
   }
 }
 
-void draw_sprite(char *buffer, unsigned char x, unsigned char y,
-                 unsigned char *sprite, unsigned char height) {
-  unsigned char mod_x = x % 64;
-  unsigned char mod_y = y % 32;
-  for (unsigned char i = 0; i < height && mod_y + i < 32; i++) {
-    unsigned char mask = 128;
-    for (unsigned char j = 0; j < 8 && mod_x + j < 64; j++) {
+void draw_sprite(char *buffer, uint8 x, uint8 y,
+                 uint8 *sprite, uint8 height) {
+  uint8 mod_x = x % 64;
+  uint8 mod_y = y % 32;
+  for (uint8 i = 0; i < height && mod_y + i < 32; i++) {
+    uint8 mask = 128;
+    for (uint8 j = 0; j < 8 && mod_x + j < 64; j++) {
       if ((sprite[i] & mask) > 0) {
         switch_pixel(buffer, mod_x + j, mod_y + i);
       }

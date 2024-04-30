@@ -3,6 +3,7 @@
 
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include "types.h"
 
 #define HEIGHT 216
 #define WIDTH 512
@@ -27,6 +28,6 @@ typedef struct {
 int create_app_window(char *buffer);
 void close_app_window();
 void clear_screen(char *buffer);
-void draw_sprite(char *buffer, unsigned char x, unsigned char y, unsigned char *sprite, unsigned char height);
+void draw_sprite(char *buffer, uint8 x, uint8 y, uint8 *sprite, uint8 height);
 
 #endif // !graphics_h
