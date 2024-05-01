@@ -59,8 +59,8 @@ typedef struct {
   uint8 delay_timer;
   uint8 sound_timer;
   unsigned char key_pressed;
+  mem_addr *stack;
   uint8 *memory;
-  uint8 *stack;
   char *display;
 } vm;
 
@@ -109,7 +109,7 @@ int init_vm(const char *program, char *display) {
     return -1;
   }
   memcpy(echip.memory + 80, font, 80);
-  echip.stack = echip.memory + 160;
+  echip.stack = (mem_addr *)(echip.memory + 160);
   echip.pc = RESERVED_SPACE;
   echip.display = display;
   fclose(fp);
@@ -136,16 +136,27 @@ void step() {
   switch (first_nibble) {
   case PREFIX_0: {
     if (right_byte == CLEAR_SCREEN) {
-      printf("We have a clear screen instruction\n");
+      printf("Clearing the screen\n");
       clear_screen(echip.display);
     } else {
+      echip.pc = *echip.stack;
+      echip.pc -= 2;
+      echip.stack--;
       printf("We have a return instruction\n");
     }
     break;
   }
   case PREFIX_1: {
     mem_addr address = (second_nibble << 8) + right_byte;
-    printf("We need to jump to %03x\n", address);
+    printf("Jumping to %03x\n", address);
+    echip.pc = address;
+    echip.pc -= 2;
+    break;
+  }
+  case PREFIX_2: {
+    mem_addr address = (second_nibble << 8) + right_byte;
+    *echip.stack = echip.pc;
+    echip.stack++;
     echip.pc = address;
     echip.pc -= 2;
     break;
@@ -314,13 +325,29 @@ void step() {
     case GET_FONT:
       echip.idx_reg = 80 + echip.registers[second_nibble];
       break;
-    case BIN_TO_DEC:
+    case BIN_TO_DEC: {
+      uint8 value = echip.registers[second_nibble];
+      uint8 ones = value % 10;
+      echip.memory[echip.idx_reg + 2] = ones;
+      value = (value - ones) / 10;
+      uint8 tens = value % 10;
+      echip.memory[echip.idx_reg + 1] = tens;
+      value = (value - tens) / 10;
+      uint8 hundreds = value % 10;
+      echip.memory[echip.idx_reg] = hundreds;
       break;
+    }
     // Some older games may rely on the index register being updated
     case STORE_REG:
+      for (uint8 i = 0; i <= second_nibble; i++) {
+        echip.memory[echip.idx_reg + i] = echip.registers[i];
+      }
       break;
     // Some older games may rely on the index register being updated
     case LOAD_REG:
+      for (uint8 i = 0; i <= second_nibble; i++) {
+        echip.registers[i] = echip.memory[echip.idx_reg + i];
+      }
       break;
     }
     break;
