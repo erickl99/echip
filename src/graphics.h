@@ -5,7 +5,7 @@
 #include <X11/Xutil.h>
 #include "types.h"
 
-#define HEIGHT 216
+#define HEIGHT 256
 #define WIDTH 512
 #define WHITE 0x00FFFFFF
 #define BLACK 0x00000000

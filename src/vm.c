@@ -123,7 +123,8 @@ void print_state() {
     printf("Register V%x: %d\n", i, echip.registers[i]);
   }
   printf("Index Register: %x\n", echip.idx_reg);
-  printf("Program Counter: %u\n", echip.pc);
+  printf("Program Counter: %x\n", echip.pc);
+  printf("Stack: %x\n", *echip.stack);
 }
 
 void step() {
@@ -136,25 +137,26 @@ void step() {
   switch (first_nibble) {
   case PREFIX_0: {
     if (right_byte == CLEAR_SCREEN) {
-      printf("Clearing the screen\n");
+      printf("CLEAR SCREEN\n");
       clear_screen(echip.display);
     } else {
-      echip.pc = *echip.stack;
+      printf("RETURN\n");
+      echip.pc = *(echip.stack - 1);
       echip.pc -= 2;
       echip.stack--;
-      printf("We have a return instruction\n");
     }
     break;
   }
   case PREFIX_1: {
     mem_addr address = (second_nibble << 8) + right_byte;
-    printf("Jumping to %03x\n", address);
+    printf("JUMP to %03x\n", address);
     echip.pc = address;
     echip.pc -= 2;
     break;
   }
   case PREFIX_2: {
     mem_addr address = (second_nibble << 8) + right_byte;
+    printf("CALL at %03x\n", address);
     *echip.stack = echip.pc;
     echip.stack++;
     echip.pc = address;
@@ -162,31 +164,34 @@ void step() {
     break;
   }
   case PREFIX_3: {
+    printf("JUMP_IF_LITERAL\n");
     if (right_byte == echip.registers[second_nibble]) {
       echip.pc += 2;
     }
     break;
   }
   case PREFIX_4: {
+    printf("JUMP_IF_NOT_LITERAL\n");
     if (right_byte != echip.registers[second_nibble]) {
       echip.pc += 2;
     }
     break;
   }
   case PREFIX_5: {
+    printf("JUMP_IF\n");
     uint8 third_nibble = right_byte >> 4;
-    if (echip.registers[second_nibble] != echip.registers[third_nibble]) {
+    if (echip.registers[second_nibble] == echip.registers[third_nibble]) {
       echip.pc += 2;
     }
     break;
   }
   case PREFIX_6: {
-    printf("Setting register %d to value %02x\n", second_nibble, right_byte);
     echip.registers[second_nibble] = right_byte;
+    printf("SET V%02x: %d\n", second_nibble, right_byte);
     break;
   }
   case PREFIX_7: {
-    printf("Adding to register %d value %02x\n", second_nibble, right_byte);
+    printf("ADD V%02x: %d\n", second_nibble, right_byte);
     echip.registers[second_nibble] += right_byte;
     break;
   }
@@ -195,6 +200,7 @@ void step() {
     uint8 fourth_nibble = right_byte & LEFT_MASK;
     switch (fourth_nibble) {
     case SET_XY: {
+      printf("SET V%02x to V%02x\n", second_nibble, third_nibble);
       echip.registers[second_nibble] = echip.registers[third_nibble];
       break;
     }
@@ -257,6 +263,7 @@ void step() {
     break;
   }
   case PREFIX_9: {
+    printf("JUMP_IF_NOT\n");
     uint8 third_nibble = right_byte >> 4;
     if (echip.registers[second_nibble] != echip.registers[third_nibble]) {
       echip.pc += 2;
@@ -265,7 +272,7 @@ void step() {
   }
   case PREFIX_A: {
     mem_addr address = (second_nibble << 8) + right_byte;
-    printf("Setting index register to value %03x\n", address);
+    printf("SET IR: %03x\n", address);
     echip.idx_reg = address;
     break;
   }
@@ -290,6 +297,7 @@ void step() {
     printf("Drawing sprite with height %d pixels at location (%d, %d)\n",
            height, x, y);
     draw_sprite(echip.display, x, y, sprite, height);
+    printf("Finished drawing sprite\n");
     break;
   }
   case PREFIX_E: {

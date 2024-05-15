@@ -28,7 +28,7 @@ int create_app_window(char *buffer) {
   win_attr.event_mask = StructureNotifyMask | KeyPressMask;
   unsigned long win_attr_mask = CWBackPixel | CWColormap | CWEventMask;
   Window app_window =
-      XCreateWindow(display, root, 0, 0, WIDTH, HEIGHT, 0, vis_info.depth,
+      XCreateWindow(display, root, 0, 0, WIDTH * 8, HEIGHT * 8, 0, vis_info.depth,
                     InputOutput, vis_info.visual, win_attr_mask, &win_attr);
 
   XSizeHints size_hints = {0};
@@ -59,11 +59,11 @@ void close_app_window() {
   XDestroyImage(xd.image);
 }
 
-static void switch_pixel(char *buffer, unsigned char x, unsigned char y) {
+static void switch_pixel(char *buffer, uint8 x, uint8 y) {
   int pitch = WIDTH * PIXEL_BYTES;
-  for (int i = 0; i < 8; i++) {
+  for (uint8 i = 0; i < 8; i++) {
     char *start = buffer + (8 * y + i) * pitch + 8 * PIXEL_BYTES * x;
-    for (int j = 0; j < 8; j++) {
+    for (uint8 j = 0; j < 8; j++) {
       unsigned int *px = (unsigned int *)(start + j * PIXEL_BYTES);
       if (*px == WHITE) {
         *px = BLACK;
@@ -74,10 +74,9 @@ static void switch_pixel(char *buffer, unsigned char x, unsigned char y) {
   }
 }
 
-void draw_sprite(char *buffer, uint8 x, uint8 y,
-                 uint8 *sprite, uint8 height) {
-  uint8 mod_x = x % 64;
+void draw_sprite(char *buffer, uint8 x, uint8 y, uint8 *sprite, uint8 height) {
   uint8 mod_y = y % 32;
+  uint8 mod_x = x % 64;
   for (uint8 i = 0; i < height && mod_y + i < 32; i++) {
     uint8 mask = 128;
     for (uint8 j = 0; j < 8 && mod_x + j < 64; j++) {
@@ -87,7 +86,8 @@ void draw_sprite(char *buffer, uint8 x, uint8 y,
       mask >>= 1;
     }
   }
-  XPutImage(xd.display, xd.app_window, xd.gc, xd.image, 0, 0, 0, 0, WIDTH, HEIGHT);
+  XPutImage(xd.display, xd.app_window, xd.gc, xd.image, 0, 0, 0, 0, WIDTH,
+            HEIGHT);
 }
 
 void clear_screen(char *buffer) {
@@ -99,5 +99,6 @@ void clear_screen(char *buffer) {
       *px = BLACK;
     }
   }
-  XPutImage(xd.display, xd.app_window, xd.gc, xd.image, 0, 0, 0, 0, WIDTH, HEIGHT);
+  XPutImage(xd.display, xd.app_window, xd.gc, xd.image, 0, 0, 0, 0, WIDTH,
+            HEIGHT);
 }
