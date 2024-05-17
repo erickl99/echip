@@ -142,7 +142,6 @@ void step() {
     } else {
       printf("RETURN\n");
       echip.pc = *(echip.stack - 1);
-      echip.pc -= 2;
       echip.stack--;
     }
     break;
