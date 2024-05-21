@@ -47,7 +47,6 @@
 #define LEFT_MASK 15
 #define MAX_SPRITE_HEIGHT 15
 #define CARRY_REGISTER 15
-#define NO_KEY 16
 
 #define MAX_ADDRESS 4096
 #define RESERVED_SPACE 512
@@ -58,7 +57,6 @@ typedef struct {
   mem_addr pc;
   uint8 delay_timer;
   uint8 sound_timer;
-  unsigned char key_pressed;
   mem_addr *stack;
   uint8 *memory;
   char *display;
@@ -127,13 +125,11 @@ void print_state() {
   printf("Stack: %x\n", *echip.stack);
 }
 
-void step() {
+void step(uint8 key_pressed) {
   uint8 left_byte = echip.memory[echip.pc];
   uint8 right_byte = echip.memory[echip.pc + 1];
   uint8 first_nibble = left_byte >> 4;
   uint8 second_nibble = left_byte & LEFT_MASK;
-  printf("Left: %02x, Right: %02x, Full: %02x, Arg: %02x\n", first_nibble,
-         second_nibble, left_byte, right_byte);
   switch (first_nibble) {
   case PREFIX_0: {
     if (right_byte == CLEAR_SCREEN) {
@@ -301,9 +297,9 @@ void step() {
   }
   case PREFIX_E: {
     unsigned char key = echip.registers[second_nibble];
-    if (right_byte == CHECK_KEY && key == echip.key_pressed) {
+    if (right_byte == CHECK_KEY && key == key_pressed) {
       echip.pc += 2;
-    } else if (right_byte == NOT_CHECK_KEY && key != echip.key_pressed) {
+    } else if (right_byte == NOT_CHECK_KEY && key != key_pressed) {
       echip.pc += 2;
     }
     break;
@@ -323,10 +319,10 @@ void step() {
       echip.idx_reg += echip.registers[second_nibble];
       break;
     case GET_KEY:
-      if (echip.key_pressed == NO_KEY) {
+      if (key_pressed == NO_KEY) {
         echip.pc -= 2;
       } else {
-        echip.registers[second_nibble] = echip.key_pressed;
+        echip.registers[second_nibble] = key_pressed;
       }
       break;
     case GET_FONT:
@@ -365,5 +361,4 @@ void step() {
   }
   }
   echip.pc += 2;
-  print_state();
 }

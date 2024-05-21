@@ -38,9 +38,10 @@ int main(int argc, char **argv) {
   clock_gettime(CLOCK_REALTIME, &frame_start);
   unsigned long target_frame_time = 1000000000 / 60;
   int close_window = 0;
-  while (!close_window) {
+  for (;;) {
     XEvent event = {0};
-    while (!close_window && XPending(xd.display) > 0) {
+    char key_pressed = NO_KEY;
+    if (XPending(xd.display) > 0) {
       printf("Received an event\n");
       XNextEvent(xd.display, &event);
       switch (event.type) {
@@ -60,11 +61,43 @@ int main(int argc, char **argv) {
         break;
       }
       case KeyPress: {
-        if (event.xkey.keycode == XKeysymToKeycode(xd.display, XK_Q)) {
+        unsigned int keycode = event.xkey.keycode;
+        if (keycode == XKeysymToKeycode(xd.display, XK_K)) {
           printf("Received exit button.\n");
           close_app_window();
-          printf("Finsihed closing window.\n");
           close_window = 1;
+        } else if (keycode == XKeysymToKeycode(xd.display, XK_1)) {
+          key_pressed = ONE_KEY;
+        } else if (keycode == XKeysymToKeycode(xd.display, XK_2)) {
+          key_pressed = TWO_KEY;
+        } else if (keycode == XKeysymToKeycode(xd.display, XK_3)) {
+          key_pressed = THREE_KEY;
+        } else if (keycode == XKeysymToKeycode(xd.display, XK_4)) {
+          key_pressed = C_KEY;
+        } else if (keycode == XKeysymToKeycode(xd.display, XK_Q)) {
+          key_pressed = FOUR_KEY;
+        } else if (keycode == XKeysymToKeycode(xd.display, XK_W)) {
+          key_pressed = FIVE_KEY;
+        } else if (keycode == XKeysymToKeycode(xd.display, XK_E)) {
+          key_pressed = SIX_KEY;
+        } else if (keycode == XKeysymToKeycode(xd.display, XK_R)) {
+          key_pressed = D_KEY;
+        } else if (keycode == XKeysymToKeycode(xd.display, XK_A)) {
+          key_pressed = SEVEN_KEY;
+        } else if (keycode == XKeysymToKeycode(xd.display, XK_S)) {
+          key_pressed = EIGHT_KEY;
+        } else if (keycode == XKeysymToKeycode(xd.display, XK_D)) {
+          key_pressed = NINE_KEY;
+        } else if (keycode == XKeysymToKeycode(xd.display, XK_F)) {
+          key_pressed = E_KEY;
+        } else if (keycode == XKeysymToKeycode(xd.display, XK_Z)) {
+          key_pressed = A_KEY;
+        } else if (keycode == XKeysymToKeycode(xd.display, XK_X)) {
+          key_pressed = ZERO_KEY;
+        } else if (keycode == XKeysymToKeycode(xd.display, XK_C)) {
+          key_pressed = B_KEY;
+        } else if (keycode == XKeysymToKeycode(xd.display, XK_V)) {
+          key_pressed = F_KEY;
         }
         break;
       }
@@ -73,7 +106,7 @@ int main(int argc, char **argv) {
     if (close_window) {
       break;
     }
-    step();
+    step(key_pressed);
     clock_gettime(CLOCK_REALTIME, &frame_finish);
     unsigned long frame_time =
         (frame_finish.tv_sec - frame_start.tv_sec) * 1000000000 +
