@@ -1,4 +1,5 @@
 #include "vm.h"
+#include "audio.h"
 #include "graphics.h"
 #include "types.h"
 #include <X11/Xlib.h>
@@ -111,10 +112,16 @@ int init_vm(const char *program, char *display) {
   echip.pc = RESERVED_SPACE;
   echip.display = display;
   fclose(fp);
+  if (init_audio() < 0) {
+    return -1;
+  }
   return 0;
 }
 
-void free_vm() { free(echip.memory); }
+void free_vm() {
+  free(echip.memory);
+  close_audio();
+}
 
 void print_state() {
   for (int i = 0; i < 16; i++) {

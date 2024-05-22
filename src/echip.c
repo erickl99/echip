@@ -20,8 +20,6 @@ int main(int argc, char **argv) {
 
   size_t buff_size = WIDTH * HEIGHT * PIXEL_BYTES * 64;
   char *raw_buffer = malloc(buff_size);
-  printf("Buffer starts at %p, ends at %p\n", raw_buffer,
-         raw_buffer + buff_size);
   if (raw_buffer == NULL) {
     fprintf(stderr, "Failed to create window drawing buffer.\n");
   }
