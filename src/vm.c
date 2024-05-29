@@ -3,6 +3,7 @@
 #include "graphics.h"
 #include "types.h"
 #include <X11/Xlib.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -61,9 +62,12 @@ typedef struct {
   mem_addr *stack;
   uint8 *memory;
   char *display;
+  audio_device ad;
+  pthread_t audio_thread;
 } vm;
 
 vm echip;
+extern pthread_mutex_t lock;
 
 uint8 font[80] = {
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
@@ -112,15 +116,16 @@ int init_vm(const char *program, char *display) {
   echip.pc = RESERVED_SPACE;
   echip.display = display;
   fclose(fp);
-  if (init_audio() < 0) {
+  if (init_audio(&echip.ad) < 0) {
     return -1;
   }
+  pthread_create(&echip.audio_thread, NULL, run_audio, (void *)&echip.ad);
   return 0;
 }
 
 void free_vm() {
   free(echip.memory);
-  close_audio();
+  close_audio(&echip.ad);
 }
 
 void print_state() {
